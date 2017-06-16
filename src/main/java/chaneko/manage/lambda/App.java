@@ -5,6 +5,7 @@ import java.util.List;
 import com.amazonaws.services.lambda.runtime.Context;
 
 import chaneko.manage.lambda.dynamo.DAO;
+import chaneko.manage.lambda.dynamo.DynamoManager;
 
 public class App {
 
@@ -35,7 +36,20 @@ public class App {
 
         for (StageContent content : stageContents) {
 
+            StaticLogger.log(content.toString());
+
             if (matchContent(content, event)) {
+
+                if (content.getDb() != null && "update".equals(content.getDb())) {
+
+                    DynamoManager manager = new DynamoManager();
+                    manager.updateItem(content.getTable(), content.getKeyName(),
+                        getKey(content.getKey(), event), content.getUpdateName(),
+                        content.getUpdateVal());
+
+                }
+
+                dao.updateStage(event.getUser_name(), content.getTo());
 
                 return Result.of(content.getText().get(mode));
             }
@@ -45,6 +59,13 @@ public class App {
         dao.updateStage(event.getUser_name(), "main");
 
         return Result.of("システムエラーです。管理者に報告されます @nakayama");
+    }
+
+    private String getKey(String key, Event event) {
+        if ("_user".equals(key)) {
+            return event.getUser_name();
+        }
+        return key;
     }
 
     public boolean matchContent(StageContent content, Event event) {

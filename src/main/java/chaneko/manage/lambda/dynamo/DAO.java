@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 
 import chaneko.manage.lambda.StageContent;
+import chaneko.manage.lambda.StaticLogger;
 
 public class DAO {
 
@@ -31,7 +32,7 @@ public class DAO {
 
         Map<String, AttributeValue> item = manager.getItem("chaneko_stage", "user_name", name);
 
-        if (item.get("mode").getS() == null || "".equals(item.get("mode").getS())) {
+        if (item.get("mode") == null || "".equals(item.get("mode").getS())) {
             manager.updateItem("chaneko_stage", "user_name", name, "mode", "text_normal");
             return "text_normal";
         }
@@ -51,7 +52,9 @@ public class DAO {
 
         Map<String, AttributeValue> item = manager.getItem("chaneko_stage_content", "stage", stage);
 
-        return item.get("content").getL().stream().map(this::convert)
+        StaticLogger.log(item.toString());
+        StaticLogger.log(item.get("contents").toString());
+        return item.get("contents").getL().stream().map(this::convert)
                 .sorted(Comparator.comparing(StageContent::getSort)).collect(Collectors.toList());
 
     }
@@ -61,11 +64,12 @@ public class DAO {
         Map<String, AttributeValue> map = val.getM();
 
         return new StageContent().setMatch(get(map.get("match"), AttributeValue::getS))
-                .setSort(get(map.get("db"), v -> Integer.parseInt(v.getN())))
+                .setSort(get(map.get("sort"), v -> Integer.parseInt(v.getS())))
                 .setText_honorific(get(map.get("text_honorific"), AttributeValue::getS))
                 .setText_neko(get(map.get("text_neko"), AttributeValue::getS))
                 .setText_normal(get(map.get("text_normal"), AttributeValue::getS))
                 .setTo(get(map.get("to"), AttributeValue::getS))
+                .setTable(get(map.get("table"), AttributeValue::getS))
                 .setType(get(map.get("type"), AttributeValue::getS))
                 .setDb(get(map.get("db"), AttributeValue::getS))
                 .setKey(get(map.get("key"), AttributeValue::getS))

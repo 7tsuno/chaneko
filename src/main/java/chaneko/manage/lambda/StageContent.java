@@ -28,6 +28,8 @@ public class StageContent {
 
     private String db;
 
+    private String table;
+
     private String key;
 
     private String keyName;
