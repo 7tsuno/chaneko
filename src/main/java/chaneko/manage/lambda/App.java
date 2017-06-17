@@ -88,6 +88,7 @@ public class App {
 		// 独自処理がある場合、実行する
 		if (content.getExecute() != null) {
 			function.get(content.getExecute()).accept(event, content);
+			
 		}
 
 		DAO dao = new DAO();
