@@ -26,7 +26,7 @@ public class StageContent {
 
     private String type;
 
-    private String db;
+    private String execute;
 
     private String table;
 
