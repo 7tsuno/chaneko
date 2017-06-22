@@ -11,6 +11,7 @@ Requirement
 
 * Slack
 * AWS Lambda
+* Dynamo DB
 * java8 (or later)
 
 Usage
