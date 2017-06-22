@@ -1,14 +1,7 @@
 # SlackOperator
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Slackでの対話式会話botシステムです。
+SlackOperator is slack's interactive response system
 
-## 前提
+## Usage
 
-* AWS Lambda
-* Dynamo DB
-* java 8以降
-
-## 対話式システム
-
-オペレータとの対話はステージと対応内容によって構成されます。  
-ステージは、会話状況の状態を表します。
