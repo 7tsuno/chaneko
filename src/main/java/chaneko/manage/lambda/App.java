@@ -3,7 +3,7 @@ package chaneko.manage.lambda;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
 import com.amazonaws.services.lambda.runtime.Context;
@@ -16,7 +16,7 @@ public class App {
 	/**
 	 * 独自処理.
 	 */
-	private Map<String, BiConsumer<Event, StageContent>> function;
+	private Map<String, BiFunction<Event, StageContent, String>> function;
 
 	/**
 	 * ハンドラ.
@@ -29,7 +29,7 @@ public class App {
 	 */
 	public Result handler(Event event, Context context) {
 
-		event.setText(event.getText().replaceFirst("@chaneko", "").trim());
+		event.setText(event.getText().replaceFirst("ちゃねこ", "").trim().replaceFirst("　", ""));
 
 		return callStage(event);
 	}
@@ -51,7 +51,7 @@ public class App {
 		return stageContents.stream().filter(content -> matchContent(content, event))
 				.map(content -> exec(content, event)).findFirst().orElseGet(() -> {
 					dao.updateStage(event.getUser_name(), "main");
-					return Result.of("システムエラーです。管理者に報告されます @nakayama");
+					return Result.of("システムエラーです");
 				});
 	}
 
@@ -80,21 +80,30 @@ public class App {
 			return Stream.of(content.getMatch().split(",")).anyMatch(match -> event.getText().equals(match));
 		}
 
+		if ("isDate".equals(type)) {
+			return DateUtil.isDate(event.getText());
+		}
+
+		if ("isTime".equals(type)) {
+			return DateUtil.isTime(event.getText());
+		}
+
 		return false;
 	}
 
 	private Result exec(StageContent content, Event event) {
 
 		// 独自処理がある場合、実行する
+		String apply = "";
 		if (content.getExecute() != null) {
-			function.get(content.getExecute()).accept(event, content);
-			
+			apply = "\r\n" + function.get(content.getExecute()).apply(event, content);
+
 		}
 
 		DAO dao = new DAO();
 		String mode = dao.getMode(event.getUser_name());
 		dao.updateStage(event.getUser_name(), content.getTo());
-		return Result.of(content.getText().get(mode));
+		return Result.of(content.getText().get(mode) + apply);
 
 	}
 
@@ -112,6 +121,7 @@ public class App {
 			DynamoManager manager = new DynamoManager();
 			manager.updateItem(content.getTable(), content.getKeyName(), getKey(content.getKey(), event),
 					content.getUpdateName(), content.getUpdateVal());
+			return "";
 		});
 
 	}
