@@ -1,8 +1,15 @@
-# SlackOperator4j
+SlackOperator4j
+==========
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 SlackOperator4j is slack's interactive response system.
 
-## Requirement
+Requirement
+==========
 
-## Usage
+* Slack
+* AWS Lambda
+* java8 (or later)
+
+Usage
+==========
