@@ -4,8 +4,6 @@ SlackOperator4j
 
 SlackOperator4j is interactive response system for Slack.
 
-## Internationalization
-
 Requirement
 ==========
 
