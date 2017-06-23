@@ -1,184 +1,179 @@
 package chaneko.manage.lambda;
 
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.lambda.runtime.Context;
 
-import chaneko.manage.lambda.dynamo.DAO;
-import chaneko.manage.lambda.dynamo.DynamoManager;
 import chaneko.manage.lambda.dynamo.InsertDAO;
+import chaneko.manage.lambda.dynamo.Item;
 import chaneko.manage.lambda.dynamo.SelectDAO;
 import chaneko.manage.lambda.dynamo.UpdateDAO;
 
 public class App {
 
-    private static final String CHANEKO_STAGE = "chaneko_stage";
+	private static final String STAGE_TABLE = "chaneko_stage";
 
-    /**
-     * 独自処理.
-     */
-    private Map<String, BiFunction<Event, StageContent, String>> function;
+	private static final long TIMEOUT_TIME = 300000;
 
-    /**
-     * ハンドラ.
-     * 
-     * @param event
-     *            イベント
-     * @param context
-     *            コンテキスト
-     * @return 返却結果
-     */
-    public Result handler(Event event, Context context) {
+	private static final String STAGE_CONTENT_TABLE = "chaneko_stage_content";
 
-        event.setText(event.getText().trim());
+	private static final String MESSAGE_TABLE = "chaneko_stage_text";
 
-        return callStage(event);
-    }
+	/**
+	 * ハンドラ.
+	 * 
+	 * @param event
+	 *            イベント
+	 * @param context
+	 *            コンテキスト
+	 * @return 返却結果
+	 */
+	public Result handler(Event event, Context context) {
+		event.setText(event.getText().trim());
 
-    /**
-     * ステージ呼び出し. <br>
-     * ステージに付随する内容を呼び出し、マッチする実行内容を実行する.
-     * 
-     * @param event
-     * @return
-     */
-    private Result callStage(Event event) {
+		return callStage(event);
+	}
 
-        DAO dao = new DAO();
-        String stage = getStage(event);
+	/**
+	 * ステージ呼び出し. <br>
+	 * ステージに付随する内容を呼び出し、マッチする実行内容を実行する.
+	 * 
+	 * @param event
+	 * @return
+	 */
+	private Result callStage(Event event) {
 
-        List<StageContent> stageContents = dao.getStageContent(stage);
+		String stage = getStage(event);
 
-        return stageContents.stream().filter(content -> matchContent(content, event))
-                .map(content -> exec(content, event)).findFirst().orElseGet(() -> {
-                    dao.updateStage(event.getUser_name(), "main");
-                    return Result.of("システムエラーです");
-                });
-    }
+		List<StageContent> stageContents = getStageContent(stage);
 
-    private String getStage(Event event) {
+		return stageContents.stream().filter(content -> matchContent(content, event))
+				.map(content -> exec(content, event)).findFirst().orElseGet(() -> {
+					return Result.of("System Error!");
+				});
+	}
 
-        Map<String, AttributeValue> stage = SelectDAO.of(CHANEKO_STAGE)
-                .setKey("user_name", event.getUser_name()).select();
+	private String getStage(Event event) {
 
-        if (stage == null) {
+		Supplier<Item> getStage = () -> SelectDAO
+				.execute(builder -> builder.tableName(STAGE_TABLE).key("user_name", event.getUser_name()));
 
-            // 新規ユーザ
-            InsertDAO.of(CHANEKO_STAGE).addInsertItem("user_name", event.getUser_name())
-                    .addInsertItem("stage", "default").addInsertItem("mode", "text_normal")
-                    .addInsertItem("last_access", String.valueOf(System.currentTimeMillis()))
-                    .addInsertItem("exit", "0").insert();
+		Item stage = getStage.get();
 
-            stage = SelectDAO.of(CHANEKO_STAGE).setKey("user_name", event.getUser_name()).select();
-        }
+		if (stage.isNull()) {
 
-        if (Long.valueOf(stage.get("last_access").getS()) + 300000 < System.currentTimeMillis()
-                || "1".equals(stage.get("last_access").getS())) {
+			// 新規ユーザの場合、ユーザを作成する
+			InsertDAO.execute(builder -> builder.tableName(STAGE_TABLE).addItem("user_name", event.getUser_name())
+					.addItem("stage", "default").addItem("mode", "text_normal")
+					.addItem("last_access", String.valueOf(System.currentTimeMillis())));
+			stage = getStage.get();
+		}
 
-            // 5分以内のアクセスでは無い場合、ステージをデフォルトに修正
-            UpdateDAO.of(CHANEKO_STAGE).setKey("user_name", event.getUser_name())
-                    .addUpdateItem("stage", "default").addUpdateItem("exit", "0");
-            stage = SelectDAO.of(CHANEKO_STAGE).setKey("user_name", event.getUser_name()).select();
-        }
+		if (Long.valueOf(stage.get("last_access")) + TIMEOUT_TIME < System.currentTimeMillis()
+				|| "1".equals(stage.get("last_access"))) {
 
-        UpdateDAO.of(CHANEKO_STAGE).setKey("user_name", event.getUser_name())
-                .addUpdateItem("last_access", String.valueOf(System.currentTimeMillis()));
+			// タイムアウトした場合とやめるを選択した場合、ステージをデフォルトに修正
+			UpdateDAO.execute(builder -> builder.tableName(STAGE_TABLE).key("user_name", event.getUser_name())
+					.addItem("stage", "default"));
+			stage = getStage.get();
+		}
 
-        return stage.get("stage").getS();
-    }
+		UpdateDAO.execute(builder -> builder.tableName(STAGE_TABLE).key("user_name", event.getUser_name())
+				.addItem("last_access", String.valueOf(System.currentTimeMillis())));
 
-    /**
-     * 取得したステージ内容が条件に一致するかを判定する.<br>
-     * 
-     * @param content
-     *            ステージ内容
-     * @param event
-     *            入力情報
-     * @return true : 一致する / false : 一致しない
-     */
-    public boolean matchContent(StageContent content, Event event) {
+		return stage.get("stage");
+	}
 
-        String type = content.getType();
+	/**
+	 * 取得したステージ内容が条件に一致するかを判定する.<br>
+	 * 
+	 * @param content
+	 *            ステージ内容
+	 * @param event
+	 *            入力情報
+	 * @return true : 一致する / false : 一致しない
+	 */
+	public boolean matchContent(StageContent content, Event event) {
 
-        if ("else".equals(type)) {
-            return true;
-        }
+		String type = content.getType();
 
-        if ("contains".equals(type)) {
-            return Stream.of(content.getMatch().split(","))
-                    .anyMatch(match -> event.getText().contains(match));
-        }
+		if ("else".equals(type)) {
+			return true;
+		}
 
-        if ("equals".equals(type)) {
-            return Stream.of(content.getMatch().split(","))
-                    .anyMatch(match -> event.getText().equals(match));
-        }
+		if ("contains".equals(type)) {
+			return Stream.of(content.getMatch().split(",")).anyMatch(match -> event.getText().contains(match));
+		}
 
-        if ("isDate".equals(type)) {
-            return DateUtil.isDate(event.getText());
-        }
+		if ("equals".equals(type)) {
+			return Stream.of(content.getMatch().split(",")).anyMatch(match -> event.getText().equals(match));
+		}
 
-        if ("isTime".equals(type)) {
-            return DateUtil.isTime(event.getText());
-        }
+		if ("isDate".equals(type)) {
+			return DateUtil.isDate(event.getText());
+		}
 
-        return false;
-    }
+		if ("isTime".equals(type)) {
+			return DateUtil.isTime(event.getText());
+		}
 
-    private Result exec(StageContent content, Event event) {
+		return false;
+	}
 
-        // 独自処理がある場合、実行する
-        String apply = "";
-        if (content.getExecute() != null) {
+	private Result exec(StageContent content, Event event) {
 
-            if ("exit".equals(content.getExecute())) {
-                UpdateDAO.of(CHANEKO_STAGE).setKey("user_name", event.getUser_name())
-                        .addUpdateItem("stage", "default").addUpdateItem("exit", "1");
-            } else {
-                apply = "\r\n" + function.get(content.getExecute()).apply(event, content);
-            }
-        }
+		if (content.getMode() != null) {
+			UpdateDAO.execute(builder -> builder.tableName(STAGE_TABLE).key("user_name", event.getUser_name())
+					.addItem("mode", content.getMode()));
+		}
 
-        DAO dao = new DAO();
-        String mode = dao.getMode(event.getUser_name());
-        dao.updateStage(event.getUser_name(), content.getTo());
+		String mode = SelectDAO
+				.execute(builder -> builder.tableName(STAGE_TABLE).key("user_name", event.getUser_name())).get("mode");
+		UpdateDAO.execute(builder -> builder.tableName(STAGE_TABLE).key("user_name", event.getUser_name())
+				.addItem("stage", content.getTo()));
 
-        if (content.getText().get(mode) == null) {
-            return Result.of(null);
-        }
+		if (content.getText() == null) {
+			return Result.of(null);
+		}
 
-        return Result.of("@" + event.getUser_name() + " " + content.getText().get(mode) + apply);
+		return Result.of("@" + event.getUser_name() + " " + content.getText().get(mode));
 
-    }
+	}
 
-    /**
-     * コンストラクタ.<br>
-     * Durationに含まれない初期化処理を実行する.<br>
-     * 単純ステージ遷移ではない独自処理をここに記述する.
-     */
-    public App() {
+	private List<StageContent> getStageContent(String stage) {
 
-        function = new HashMap<>();
+		Item item = SelectDAO.execute(builder -> builder.tableName(STAGE_CONTENT_TABLE).key("stage", stage));
 
-        // DB更新処理
-        function.put("update", (event, content) -> {
-            DynamoManager manager = new DynamoManager();
-            manager.updateItem(content.getTable(), content.getKeyName(),
-                getKey(content.getKey(), event), content.getUpdateName(), content.getUpdateVal());
-            return "";
-        });
+		return item.getList("contents").stream().map(this::convert).sorted(Comparator.comparing(StageContent::getSort))
+				.collect(Collectors.toList());
 
-    }
+	}
 
-    private String getKey(String key, Event event) {
-        if ("_user".equals(key)) {
-            return event.getUser_name();
-        }
-        return key;
-    }
+	private StageContent convert(AttributeValue val) {
+
+		Map<String, AttributeValue> map = val.getM();
+
+		Map<String, String> collect = map.entrySet().stream()
+				.collect(Collectors.toMap(entry -> entry.getKey(), entry -> entry.getValue().getS()));
+
+		return new StageContent().setMatch(collect.get("match")).setMode(collect.get("mode"))
+				.setSort(Integer.valueOf(collect.get("sort"))).setText(getText(collect.get("text")))
+				.setTo(collect.get("to")).setType(collect.get("type"));
+	}
+
+	private Map<String, String> getText(String id) {
+
+		if (id == null) {
+			return null;
+		}
+
+		return SelectDAO.execute(builder -> builder.tableName(MESSAGE_TABLE).key("message_id", id)).getToMap();
+	}
+
 }

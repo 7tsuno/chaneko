@@ -2,6 +2,7 @@ package chaneko.manage.lambda.dynamo;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import com.amazonaws.services.dynamodbv2.model.AttributeAction;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
@@ -9,39 +10,42 @@ import com.amazonaws.services.dynamodbv2.model.AttributeValueUpdate;
 
 public class UpdateDAO {
 
-    private String tableName;
+	private String tableName;
 
-    private String keyName;
+	private String keyName;
 
-    private String keyValue;
+	private String keyValue;
 
-    private Map<String, AttributeValueUpdate> items;
+	private Map<String, AttributeValueUpdate> items;
 
-    private UpdateDAO() {
-    }
+	private UpdateDAO() {
+	}
 
-    public static UpdateDAO of(String tableName) {
-        UpdateDAO builder = new UpdateDAO();
-        builder.tableName = tableName;
-        builder.items = new HashMap<>();
-        return builder;
-    }
+	public static void execute(Consumer<UpdateDAO> builder) {
+		UpdateDAO dao = new UpdateDAO();
+		dao.items = new HashMap<>();
+		builder.accept(dao);
+		Map<String, AttributeValue> key = new HashMap<>();
+		key.put(dao.keyName, new AttributeValue(dao.keyValue));
+		DBClient.get().updateItem(dao.tableName, key, dao.items);
 
-    public UpdateDAO setKey(String keyName, String keyValue) {
-        this.keyName = keyName;
-        this.keyValue = keyValue;
-        return this;
-    }
+	}
 
-    public UpdateDAO addUpdateItem(String updateColumnName, String updateColumnValue) {
-        items.put(updateColumnName,
-            new AttributeValueUpdate(new AttributeValue(updateColumnValue), AttributeAction.PUT));
-        return this;
-    }
+	public UpdateDAO tableName(String tableName) {
+		this.tableName = tableName;
+		return this;
+	}
 
-    public void update() {
-        Map<String, AttributeValue> key = new HashMap<>();
-        key.put(keyName, new AttributeValue(keyValue));
-        DBClient.get().updateItem(tableName, key, items);
-    }
+	public UpdateDAO key(String keyName, String keyValue) {
+		this.keyName = keyName;
+		this.keyValue = keyValue;
+		return this;
+	}
+
+	public UpdateDAO addItem(String updateColumnName, String updateColumnValue) {
+		items.put(updateColumnName,
+				new AttributeValueUpdate(new AttributeValue(updateColumnValue), AttributeAction.PUT));
+		return this;
+	}
+
 }
