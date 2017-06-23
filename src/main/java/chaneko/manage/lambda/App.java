@@ -77,7 +77,7 @@ public class App {
             stage = SelectDAO.of(CHANEKO_STAGE).setKey("user_name", event.getUser_name()).select();
         }
 
-        if (Long.valueOf(stage.get("last_access").getS()) + 300000 > System.currentTimeMillis()
+        if (Long.valueOf(stage.get("last_access").getS()) + 300000 < System.currentTimeMillis()
                 || "1".equals(stage.get("last_access").getS())) {
 
             // 5分以内のアクセスでは無い場合、ステージをデフォルトに修正
