@@ -12,7 +12,7 @@ Description
 1. User writes to Slack in browser.
 1. Slack Outgoing WebHooks calls API of AWS Lambda.
 1. AWS Lambda implemented by Chaneko gets the conversation pattern from the DynamoDB and responds.
-1. If you need to do other processing by responds, Chaneko call another Lambda.
+1. If you need to do other processing by responds, Chaneko call other Lambda.
 
 ![flow](https://github.com/7tsuno/chaneko/blob/image/src/main/resources/image/chanekoFlow.png?raw=true)
 
