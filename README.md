@@ -1,8 +1,8 @@
-SlackOperator4j
+chaneko
 ==========
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-SlackOperator4j is interactive response system for Slack.
+chaneko is interactive response system for Slack.
 
 Requirement
 ==========
