@@ -6,6 +6,10 @@ Chaneko is interactive response system for Slack.
 
 ![chaneko](https://github.com/7tsuno/chaneko/blob/image/src/main/resources/image/chanekoLogo.png?raw=true)
 
+Demo
+==========
+Demo that works with gif.
+
 Description
 ==========
 
