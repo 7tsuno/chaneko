@@ -1,5 +1,7 @@
 package chaneko.manage.lambda;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +11,7 @@ import java.util.stream.Stream;
 
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
 
 import chaneko.manage.lambda.dynamo.InsertDAO;
 import chaneko.manage.lambda.dynamo.Item;
@@ -23,6 +26,8 @@ public class App {
 
     private static final String MESSAGE_TABLE = "chaneko_stage_text";
 
+    private static final String LOG_TABLE = "chaneko_log";
+
     /**
      * ハンドラ.
      * 
@@ -33,6 +38,10 @@ public class App {
      * @return 返却結果
      */
     public Result handler(Event event, Context context) {
+
+        LambdaLogger lambdaLogger = context.getLogger();
+        lambdaLogger.log("event = " + event);
+
         event.setText(event.getText().trim());
 
         return callStage(event);
